@@ -1,0 +1,35 @@
+# Personal access token that has scopes public, private, edit, and upload
+personal_access_token: <token>
+
+# Date of the first class of the semester in the format YYYY-MM-dd
+semester_start_date: <start date>
+
+# Absolute path to the folder recordings are saved to. The program will open this folder and check for files with an .mp4 extension.
+upload_folder_path: <path>
+
+# Absolute path to the folder recordings are moved to when the upload is complete. If left empty, this defaults to the same folder as where the program is currently running. The program will create a folder named 'uploaded' if one does not exist and place uploaded files inside.
+finished_folder_path: <path>
+
+# Videos are uploaded in chunks, this specifies chunk size. Chunks that are too small slow down uploads, but this has to be balanced with memory usage.
+chunk_size_mb: <chunk size>
+
+# Controls how much information the program outputs. Error is least, debug is most (and should be rarely used).
+log_level: <error | info | debug>
+
+video_settings:
+  content_rating: <rating>
+  privacy:
+    # who can comment on the video
+    comments: <anybody | contacts | nobody>
+    
+    # if the video can be embedded
+    embed: <private | public | whitelist>
+    
+    # who can view the video
+    view: <anybody | contacts | disable | nobody | password | unlisted >
+
+# List of current semester's classes with corresponding information to process and format uploads
+classes:
+  - name: <name>
+    day_of_week: <day the class is on>
+    start_time: <class start time>
