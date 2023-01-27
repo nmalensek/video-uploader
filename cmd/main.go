@@ -19,7 +19,7 @@ var (
 )
 
 const (
-	renameFileHint = "you may want to try renaming the file with a timestamp at the start (ex. 2023-01-01 <filename>"
+	renameFileHint = "you may want to try renaming the file with a timestamp of when it was created at the start (ex. 2023-01-01 <filename>)"
 )
 
 type uploadConfig struct {
@@ -110,14 +110,24 @@ func uploadFiles(conf uploadConfig) {
 		}
 
 		var fileCreationDate time.Time
-		// fallback if filename is not prefixed with timestamp
-		t, err := creationDateFromMDLS(file.Name(), conf.UploadFolderPath)
-		if err != nil {
-			// error messages printed in called function
-			continue
-		}
 
-		fileCreationDate = t
+		nameChunks := strings.Split(file.Name(), " ")
+
+		d, pErr := time.Parse("2006-01-02", nameChunks[0])
+		if pErr != nil {
+			fmt.Printf("unable to get creation date from name, falling back to mdls...\n")
+
+			// fallback if filename is not prefixed with timestamp
+			t, err := creationDateFromMDLS(file.Name(), conf.UploadFolderPath)
+			if err != nil {
+				// error messages printed in called function, skip file since both methods failed.
+				continue
+			}
+
+			fileCreationDate = t
+		} else {
+			fileCreationDate = d
+		}
 
 	}
 }
