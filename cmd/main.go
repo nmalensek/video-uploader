@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nmalensek/vimeo-uploader/internal/app/passphrase"
+	"github.com/nmalensek/vimeo-uploader/internal/app/vimeo"
 	"gopkg.in/yaml.v3"
 )
 
@@ -25,29 +26,13 @@ const (
 )
 
 type uploadConfig struct {
-	SemesterStartDate  time.Time     `yaml:"semester_start_date"`
-	UploadFolderPath   string        `yaml:"upload_folder_path"`
-	FinishedFolderPath string        `yaml:"finished_folder_path"`
-	ChunkSizeMB        int           `yaml:"chunk_size_mb"`
-	LogLevel           string        `yaml:"log_level"`
-	VimeoSettings      vimeoSettings `yaml:"vimeo_settings"`
-	Classes            []class       `yaml:"classes"`
-}
-
-type vimeoSettings struct {
-	PersonalAccessToken string         `yaml:"personal_access_token"`
-	UploadSettings      uploadSettings `yaml:"upload_settings"`
-}
-
-type uploadSettings struct {
-	ContentRating string  `yaml:"content_rating"`
-	Privacy       privacy `yaml:"privacy"`
-}
-
-type privacy struct {
-	Comments string `yaml:"comments"`
-	Embed    string `yaml:"embed"`
-	View     string `yaml:"view"`
+	SemesterStartDate  time.Time      `yaml:"semester_start_date"`
+	UploadFolderPath   string         `yaml:"upload_folder_path"`
+	FinishedFolderPath string         `yaml:"finished_folder_path"`
+	ChunkSizeMB        int            `yaml:"chunk_size_mb"`
+	LogLevel           string         `yaml:"log_level"`
+	VimeoSettings      vimeo.Settings `yaml:"vimeo_settings"`
+	Classes            []class        `yaml:"classes"`
 }
 
 type class struct {
@@ -57,13 +42,15 @@ type class struct {
 }
 
 type uploader interface {
-	Upload(fileName string, filePath string, chunkSize int) error
+	Upload(fileName, filePath, password string, fileSize int64, chunkSize int) error
 }
 
 func main() {
 	cfg := readConfig()
 
-	processFiles(cfg)
+	vimeoUploader := vimeo.NewUploader()
+
+	processFiles(cfg, vimeoUploader)
 }
 
 func readConfig() uploadConfig {
@@ -98,7 +85,7 @@ func readConfig() uploadConfig {
 	return conf
 }
 
-func processFiles(conf uploadConfig) {
+func processFiles(conf uploadConfig, uploadClient uploader) {
 	files, err := os.ReadDir(conf.UploadFolderPath)
 	if err != nil {
 		log.Fatal(err)
@@ -151,8 +138,10 @@ func processFiles(conf uploadConfig) {
 			continue
 		}
 
-		// upload
-
+		uErr := uploadClient.Upload(fileName, fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()), password, i.Size(), conf.ChunkSizeMB)
+		if uErr != nil {
+			fmt.Printf("error uploading %v, file may need to be re-processed. skipping...\n", file.Name())
+		}
 	}
 }
 
