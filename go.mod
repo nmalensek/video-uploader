@@ -1,4 +1,4 @@
-module github.com/nmalensek/vimeo-uploader
+module github.com/nmalensek/video-uploader
 
 go 1.19
 

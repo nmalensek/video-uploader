@@ -31,5 +31,18 @@ func NewUploader() Uploader {
 }
 
 func (u Uploader) Upload(fileName, filePath, password string, fileSize int64, chunkSize int) error {
+
+	// check for existing file (failed initial upload case)
+
+	// if it's a new upload, make a call to set up all the base information
+
+	// if it's not new, continue uploading from specified byte position
+
 	return nil
 }
+
+// description
+// name
+// password
+// upload.approach
+// upload.size

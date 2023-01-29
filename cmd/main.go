@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nmalensek/vimeo-uploader/internal/app/passphrase"
-	"github.com/nmalensek/vimeo-uploader/internal/app/vimeo"
+	"github.com/nmalensek/video-uploader/internal/app/passphrase"
+	"github.com/nmalensek/video-uploader/internal/app/vimeo"
 	"gopkg.in/yaml.v3"
 )
 
@@ -215,18 +215,6 @@ func classNameWeek(conf uploadConfig, date time.Time) (string, error) {
 	return fmt.Sprintf("%v - Week %v", className, weekNumber), nil
 }
 
-// description
-// name
-// password
-// upload.approach
-// upload.size
-
-// for each .mp4 file
-//  based on date, get class name from config
-//  calculate weeks since start
-//      that's the name
-//  generate password
-//  get file size
 //  post to upload endpoint with derived name + week, standard settings, password, and length
 //      returns upload URI
 //      what status codes can this return? conflict? unauth?

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nmalensek/vimeo-uploader/internal/app/passphrase"
+	"github.com/nmalensek/video-uploader/internal/app/passphrase"
 )
 
 func TestGenerate(t *testing.T) {
