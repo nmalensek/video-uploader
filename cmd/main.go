@@ -24,6 +24,7 @@ type uploadConfig struct {
 	SemesterStartDate  time.Time        `yaml:"semester_start_date"`
 	UploadFolderPath   string           `yaml:"upload_folder_path"`
 	FinishedFolderPath string           `yaml:"finished_folder_path"`
+	VideoStatusPath    string           `yaml:"upload_status_path"`
 	ChunkSizeMB        int              `yaml:"chunk_size_mb"`
 	LogLevel           string           `yaml:"log_level"`
 	VimeoSettings      vimeo.Settings   `yaml:"vimeo_settings"`

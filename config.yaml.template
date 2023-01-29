@@ -7,6 +7,10 @@ upload_folder_path: <path>
 # Absolute path to the folder recordings are moved to when the upload is complete. If left empty, this defaults to the same folder as where the program is currently running. The program will create a folder named 'uploaded' if one does not exist and place uploaded files inside.
 finished_folder_path: <path>
 
+# Absolute path to folder where data about file upload status is saved in JSON format.
+# Contains video name, whether it was successfully uploaded, and the video's URI.
+upload_status_path: <path>
+
 # Videos are uploaded in chunks, this specifies chunk size. Chunks that are too small slow down uploads, but this has to be balanced with memory usage.
 chunk_size_mb: <chunk size>
 
