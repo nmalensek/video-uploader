@@ -1,19 +1,18 @@
 package main
 
 import (
-	"crypto/rand"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
-	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/nmalensek/vimeo-uploader/internal/app/passphrase"
 	"gopkg.in/yaml.v3"
 )
 
@@ -146,7 +145,7 @@ func processFiles(conf uploadConfig) {
 			continue
 		}
 
-		password, pErr := genPassword()
+		password, pErr := passphrase.Generate()
 		if pErr != nil {
 			fmt.Printf("error generating random password: %v, skipping file...\n", err)
 			continue
@@ -225,29 +224,6 @@ func classNameWeek(conf uploadConfig, date time.Time) (string, error) {
 	weekNumber := time.Since(conf.SemesterStartDate).Hours() / 168
 
 	return fmt.Sprintf("%v - Week %v", className, weekNumber), nil
-}
-
-func genPassword() (string, error) {
-	// generate password
-	// 5 numbers define a word, use 4 words.
-	wordIDLen := 5
-	wordCount := 4
-	words := make([]string, wordCount)
-
-	for i := 0; i < wordCount; i++ {
-		wordID := make([]string, wordIDLen)
-		for j := 0; j < wordIDLen; j++ {
-			num, err := rand.Int(rand.Reader, big.NewInt(int64(5)))
-			if err != nil {
-				return "", err
-			}
-			wordID = append(wordID, num.String())
-		}
-
-		// get word out of dict
-	}
-
-	return strings.Join(words, "_"), nil
 }
 
 // description
