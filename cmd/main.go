@@ -146,31 +146,8 @@ func processFiles(conf uploadConfig) {
 			continue
 		}
 
-		// generate password if vimeo
-		// 5 numbers define a word, use 4 words.
-		wordIDLen := 5
-		wordCount := 4
-		words := make([]string, wordCount)
-
-		for i := 0; i < wordCount; i++ {
-			wordID := make([]string, wordIDLen)
-			for j := 0; j < wordIDLen; j++ {
-				num, err := rand.Int(rand.Reader, big.NewInt(int64(5)))
-				if err != nil {
-					// break, length check in outer loop will skip file.
-					break
-				}
-				wordID = append(wordID, num.String())
-			}
-
-			if len(wordID) != wordIDLen {
-				break
-			}
-
-			// get word out of dict
-		}
-
-		if len(words) != wordCount {
+		password, pErr := genPassword()
+		if pErr != nil {
 			fmt.Printf("error generating random password: %v, skipping file...\n", err)
 			continue
 		}
@@ -248,6 +225,29 @@ func classNameWeek(conf uploadConfig, date time.Time) (string, error) {
 	weekNumber := time.Since(conf.SemesterStartDate).Hours() / 168
 
 	return fmt.Sprintf("%v - Week %v", className, weekNumber), nil
+}
+
+func genPassword() (string, error) {
+	// generate password
+	// 5 numbers define a word, use 4 words.
+	wordIDLen := 5
+	wordCount := 4
+	words := make([]string, wordCount)
+
+	for i := 0; i < wordCount; i++ {
+		wordID := make([]string, wordIDLen)
+		for j := 0; j < wordIDLen; j++ {
+			num, err := rand.Int(rand.Reader, big.NewInt(int64(5)))
+			if err != nil {
+				return "", err
+			}
+			wordID = append(wordID, num.String())
+		}
+
+		// get word out of dict
+	}
+
+	return strings.Join(words, "_"), nil
 }
 
 // description
