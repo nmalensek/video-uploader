@@ -1,10 +1,13 @@
 package main
 
 import (
+	"crypto/rand"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,17 +26,21 @@ const (
 )
 
 type uploadConfig struct {
-	PersonalAccessToken string        `yaml:"personal_access_token"`
-	SemesterStartDate   string        `yaml:"semester_start_date"`
-	UploadFolderPath    string        `yaml:"upload_folder_path"`
-	FinishedFolderPath  string        `yaml:"finished_folder_path"`
-	ChunkSizeMB         int           `yaml:"chunk_size_mb"`
-	LogLevel            string        `yaml:"log_level"`
-	VideoSettings       videoSettings `yaml:"video_settings"`
-	Classes             []class       `yaml:"classes"`
+	SemesterStartDate  time.Time     `yaml:"semester_start_date"`
+	UploadFolderPath   string        `yaml:"upload_folder_path"`
+	FinishedFolderPath string        `yaml:"finished_folder_path"`
+	ChunkSizeMB        int           `yaml:"chunk_size_mb"`
+	LogLevel           string        `yaml:"log_level"`
+	VimeoSettings      vimeoSettings `yaml:"vimeo_settings"`
+	Classes            []class       `yaml:"classes"`
 }
 
-type videoSettings struct {
+type vimeoSettings struct {
+	PersonalAccessToken string         `yaml:"personal_access_token"`
+	UploadSettings      uploadSettings `yaml:"upload_settings"`
+}
+
+type uploadSettings struct {
 	ContentRating string  `yaml:"content_rating"`
 	Privacy       privacy `yaml:"privacy"`
 }
@@ -50,10 +57,14 @@ type class struct {
 	StartTime time.Time `yaml:"start_time"`
 }
 
+type uploader interface {
+	Upload(fileName string, filePath string, chunkSize int) error
+}
+
 func main() {
 	cfg := readConfig()
 
-	uploadFiles(cfg)
+	processFiles(cfg)
 }
 
 func readConfig() uploadConfig {
@@ -88,7 +99,7 @@ func readConfig() uploadConfig {
 	return conf
 }
 
-func uploadFiles(conf uploadConfig) {
+func processFiles(conf uploadConfig) {
 	files, err := os.ReadDir(conf.UploadFolderPath)
 	if err != nil {
 		log.Fatal(err)
@@ -118,7 +129,7 @@ func uploadFiles(conf uploadConfig) {
 			fmt.Printf("unable to get creation date from name, falling back to mdls...\n")
 
 			// fallback if filename is not prefixed with timestamp
-			t, err := creationDateFromMDLS(file.Name(), conf.UploadFolderPath)
+			t, err := creationDateFromMDLS(file.Name())
 			if err != nil {
 				// error messages printed in called function, skip file since both methods failed.
 				continue
@@ -129,10 +140,47 @@ func uploadFiles(conf uploadConfig) {
 			fileCreationDate = d
 		}
 
+		fileName, err := classNameWeek(conf, fileCreationDate)
+		if err != nil {
+			// error messages printed in called function, skip file since which class it is is unknown.
+			continue
+		}
+
+		// generate password if vimeo
+		// 5 numbers define a word, use 4 words.
+		wordIDLen := 5
+		wordCount := 4
+		words := make([]string, wordCount)
+
+		for i := 0; i < wordCount; i++ {
+			wordID := make([]string, wordIDLen)
+			for j := 0; j < wordIDLen; j++ {
+				num, err := rand.Int(rand.Reader, big.NewInt(int64(5)))
+				if err != nil {
+					// break, length check in outer loop will skip file.
+					break
+				}
+				wordID = append(wordID, num.String())
+			}
+
+			if len(wordID) != wordIDLen {
+				break
+			}
+
+			// get word out of dict
+		}
+
+		if len(words) != wordCount {
+			fmt.Printf("error generating random password: %v, skipping file...\n", err)
+			continue
+		}
+
+		// upload
+
 	}
 }
 
-func creationDateFromMDLS(filename, path string) (time.Time, error) {
+func creationDateFromMDLS(filename string) (time.Time, error) {
 
 	// TODO: validate command, if needed prepend path to name
 	metadata := exec.Command("mdls", filename, "-name \"kMDItemContentCreationDate\"")
@@ -172,6 +220,36 @@ func creationDateFromMDLS(filename, path string) (time.Time, error) {
 	return d, nil
 }
 
+func classNameWeek(conf uploadConfig, date time.Time) (string, error) {
+	className := ""
+	for _, c := range conf.Classes {
+		if c.DayOfWeek != date.Weekday().String() {
+			continue
+		}
+
+		// TODO: convert potential string time into something accurate
+
+		fifteenMinsBefore := date.Add(time.Minute * -15)
+		thirtyMinsAfter := date.Add(time.Minute * 30)
+
+		if c.StartTime.Before(thirtyMinsAfter) && c.StartTime.After(fifteenMinsBefore) {
+			className = c.Name
+			break
+		}
+	}
+
+	if className == "" {
+		fmt.Printf("could not determine class name based on file creation date, skipping file...\n")
+		fmt.Println(renameFileHint)
+		return "", errors.New("failed to determine class name from file creation date")
+	}
+
+	// 168 hours per week
+	weekNumber := time.Since(conf.SemesterStartDate).Hours() / 168
+
+	return fmt.Sprintf("%v - Week %v", className, weekNumber), nil
+}
+
 // description
 // name
 // password
@@ -179,10 +257,7 @@ func creationDateFromMDLS(filename, path string) (time.Time, error) {
 // upload.size
 
 // for each .mp4 file
-//  look at the filename/date to get class name
-// 	need to deal with two file naming conventions:
-// 		try extracting from filename
-// 			if that doesn't work, pipe mdls output to awk and extract date
+//  based on date, get class name from config
 //  calculate weeks since start
 //      that's the name
 //  generate password

@@ -1,6 +1,3 @@
-# Personal access token that has scopes public, private, edit, and upload
-personal_access_token: <token>
-
 # Date of the first class of the semester in the format YYYY-MM-dd
 semester_start_date: <start date>
 
@@ -16,17 +13,22 @@ chunk_size_mb: <chunk size>
 # Controls how much information the program outputs. Error is least, debug is most (and should be rarely used).
 log_level: <error | info | debug>
 
-video_settings:
-  content_rating: <rating>
-  privacy:
-    # who can comment on the video
-    comments: <anybody | contacts | nobody>
-    
-    # if the video can be embedded
-    embed: <private | public | whitelist>
-    
-    # who can view the video
-    view: <anybody | contacts | disable | nobody | password | unlisted >
+# Vimeo-specific settings, based on v3.4 of their APIs
+vimeo_settings:
+  # Personal access token that has scopes public, private, edit, and upload
+  personal_access_token: <token>
+  
+  upload_settings:
+    content_rating: <drugs | language | nudity | safe | unrated | violence>
+    privacy:
+      # who can comment on the video
+      comments: <anybody | contacts | nobody>
+      
+      # if the video can be embedded
+      embed: <private | public | whitelist> # private = can't embed
+      
+      # who can view the video
+      view: <anybody | contacts | disable | nobody | password | unlisted >
 
 # List of current semester's classes with corresponding information to process and format uploads
 classes:
