@@ -32,7 +32,7 @@ type uploadConfig struct {
 }
 
 type uploader interface {
-	Upload(fileName, filePath, password string, fileSize int64, chunkSize int) error
+	Upload(data vimeo.UploadData) error
 }
 
 func main() {
@@ -128,7 +128,14 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 			continue
 		}
 
-		uErr := uploadClient.Upload(fileName, fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()), password, i.Size(), conf.ChunkSizeMB)
+		uErr := uploadClient.Upload(vimeo.UploadData{
+			Filename:  fileName,
+			FilePath:  fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()),
+			Password:  password,
+			FileSize:  i.Size(),
+			ChunkSize: conf.ChunkSizeMB,
+		})
+
 		if uErr != nil {
 			fmt.Printf("error uploading %v, file may need to be re-processed. skipping...\n", file.Name())
 		}
@@ -138,7 +145,7 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 //  post to upload endpoint with derived name + week, standard settings, password, and length
 //      returns upload URI
 // 		if ok status code, save video name and upload URI to .json "database" file with status "IN_PROGRESS"
-//      what status codes can this return? conflict? unauth?
+//      what status codes can this return? conflict? unauth? If an error response occurs, set status "ERROR" and fill out error details in the file
 //  open file and stream in chunk size chunks to returned upload URI
 //  log progress per chunk (verbose)
 //  log when finished with name, password

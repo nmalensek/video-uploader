@@ -21,6 +21,16 @@ type Privacy struct {
 	View     string `yaml:"view"`
 }
 
+// UploadData holds everything needed for an upload
+type UploadData struct {
+	Filename  string
+	FilePath  string
+	Password  string
+	FileSize  int64
+	ChunkSize int
+	// TODO: DB interface
+}
+
 type Uploader struct {
 	client   http.Client
 	settings Settings
@@ -30,8 +40,8 @@ func NewUploader() Uploader {
 	return Uploader{}
 }
 
-func (u Uploader) Upload(fileName, filePath, password string, fileSize int64, chunkSize int) error {
-	// check for existing file (failed initial upload case)
+func (u Uploader) Upload(data UploadData) error {
+	// check for existing file in tracking file (failed initial upload case)
 
 	// if it's a new upload, make a call to set up all the base information
 
