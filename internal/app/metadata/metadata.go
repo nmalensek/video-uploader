@@ -55,7 +55,10 @@ func CreationDateFromMDLS(absolutePath string) (time.Time, error) {
 		return time.Now(), err
 	}
 
-	return d, nil
+	//mdls returns UTC time; UTC to local offset will be 6 or 7 hours depending on DST.
+	utcLocalOffset := time.Now().UTC().Sub(time.Now().Local())
+
+	return d.Add(utcLocalOffset * -1), nil
 }
 
 // ClassNameWeek derives the semester, class name, and week of the semester it occurred on.
