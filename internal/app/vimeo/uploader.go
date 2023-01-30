@@ -28,12 +28,12 @@ type UploadData struct {
 	Password  string
 	FileSize  int64
 	ChunkSize int
-	// TODO: DB interface
 }
 
 type Uploader struct {
 	client   http.Client
 	settings Settings
+	// TODO: DB interface
 }
 
 func NewUploader() Uploader {
