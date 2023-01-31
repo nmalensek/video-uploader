@@ -1,9 +1,9 @@
 package database
 
-// Datastore contains access patterns for datastores.
-type Datastore interface {
-	Get(key string) (UploadRecord, error)
-	Put(key string) error
+// UploadDatastore contains access patterns for upload datastores.
+type UploadDatastore interface {
+	GetUpload(key string) (UploadRecord, error)
+	PutUpload(item UploadRecord) error
 }
 
 // UploadRecord is information about the status of a file upload attempt and the errors
