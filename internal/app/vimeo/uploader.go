@@ -1,6 +1,11 @@
 package vimeo
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/nmalensek/video-uploader/internal/app/database"
+	"github.com/nmalensek/video-uploader/internal/app/database/filedb"
+)
 
 // Settings contains the PAT and settings used for video uploads.
 type Settings struct {
@@ -31,13 +36,26 @@ type UploadData struct {
 }
 
 type Uploader struct {
-	client   http.Client
+	client   httpCaller
 	settings Settings
-	// TODO: DB interface
+	uploadDB database.UploadDatastore
 }
 
-func NewUploader() Uploader {
-	return Uploader{}
+type httpCaller interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
+func NewUploader(outputFolderPath string, hc httpCaller, s Settings) (Uploader, error) {
+	uploadDBConn, err := filedb.New(outputFolderPath)
+	if err != nil {
+		return Uploader{}, err
+	}
+
+	return Uploader{
+		client:   hc,
+		settings: s,
+		uploadDB: uploadDBConn,
+	}, nil
 }
 
 func (u Uploader) Upload(data UploadData) error {

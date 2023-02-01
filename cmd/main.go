@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,7 +39,14 @@ type uploader interface {
 func main() {
 	cfg := readConfig()
 
-	vimeoUploader := vimeo.NewUploader()
+	cl := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	vimeoUploader, err := vimeo.NewUploader(cfg.VideoStatusPath, cl, cfg.VimeoSettings)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	processFiles(cfg, vimeoUploader)
 }
