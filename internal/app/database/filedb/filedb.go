@@ -59,6 +59,10 @@ func (f FileDB) GetUpload(key string) (database.UploadRecord, error) {
 
 // PutUpload writes the given UploadRecord to the uploadFile, overwriting the current item if it exists.
 func (f FileDB) PutUpload(item database.UploadRecord) error {
+	if item.Name == "" {
+		return fmt.Errorf("cannnot save item %+v, name is empty", item)
+	}
+
 	file, err := os.Open(f.uploadsFile)
 	if err != nil {
 		return fmt.Errorf("error opening uploads file: %v", err)

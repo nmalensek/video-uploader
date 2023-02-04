@@ -7,16 +7,28 @@ type UploadDatastore interface {
 }
 
 // UploadRecord is information about the status of a file upload attempt and the errors
-// that occurred, if any. If an upload fails but its URI is populated, the upload may be resumable
+// that occurred, if any. If an upload fails but its tus URI is populated, the upload may be resumable
 // depending on upload implementation. If an error occurred, the status will be set correspondingly
 // and contain details about the error.
 type UploadRecord struct {
 	Name         string       `json:"name"`
-	URI          string       `json:"uri"`
+	TusURI       string       `json:"tus_uri"`
+	VideoURI     string       `json:"video_uri"`
 	Status       UploadStatus `json:"status"`
 	ErrorDetails error        `json:"errorDetails,omitempty"`
 }
 
+// IsEmpty checks relevant UploadRecord properties and returns whether it contains data.
+// Name is used as the key so it must not be empty if the record exists.
+func (u UploadRecord) IsEmpty() bool {
+	if u.Name != "" {
+		return false
+	}
+
+	return true
+}
+
+// UploadStatus is a string representing the state of an UploadRecord. Helps determine whether an upload was completed successfully.
 type UploadStatus string
 
 const (
