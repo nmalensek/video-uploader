@@ -35,11 +35,20 @@ func New(outputFolder string) (FileDB, error) {
 
 // GetUpload reads the uploadsFile and gets the record if it exists or returns an empty UploadRecord.
 func (f FileDB) GetUpload(key string) (database.UploadRecord, error) {
-	file, err := os.Open(f.uploadsFile)
+	file, err := os.OpenFile(f.uploadsFile, os.O_CREATE|os.O_RDONLY, 0644)
 	if err != nil {
 		return database.UploadRecord{}, fmt.Errorf("error opening uploads file: %v", err)
 	}
 	defer file.Close()
+
+	s, err := file.Stat()
+	if err != nil {
+		return database.UploadRecord{}, fmt.Errorf("error checking uploads file length: %v", err)
+	}
+
+	if s.Size() == 0 {
+		return database.UploadRecord{}, nil
+	}
 
 	// bad practice: read in the whole file. however, file should only grow by ~200kb max per year if a new
 	// file is not generated per year.
@@ -63,23 +72,33 @@ func (f FileDB) PutUpload(item database.UploadRecord) error {
 		return fmt.Errorf("cannnot save item %+v, name is empty", item)
 	}
 
-	file, err := os.Open(f.uploadsFile)
+	file, err := os.OpenFile(f.uploadsFile, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return fmt.Errorf("error opening uploads file: %v", err)
 	}
 	defer file.Close()
 
-	// bad practice: read in the whole file. however, file should only grow by ~200kb max per year if a new
-	// file is not generated per year.
-	bytes, err := io.ReadAll(file)
+	s, err := file.Stat()
 	if err != nil {
-		return fmt.Errorf("error reading uploads file: %v", err)
+		return fmt.Errorf("error checking uploads file length: %v", err)
 	}
 
 	var uploadRecords map[string]database.UploadRecord
-	err = json.Unmarshal(bytes, &uploadRecords)
-	if err != nil {
-		return fmt.Errorf("error unmarshaling uploads file: %v", err)
+
+	if s.Size() == 0 {
+		uploadRecords = make(map[string]database.UploadRecord)
+	} else {
+		// bad practice: read in the whole file. however, file should only grow by ~200kb max per year if a new
+		// file is not generated per year.
+		bytes, err := io.ReadAll(file)
+		if err != nil {
+			return fmt.Errorf("error reading uploads file: %v", err)
+		}
+
+		err = json.Unmarshal(bytes, &uploadRecords)
+		if err != nil {
+			return fmt.Errorf("error unmarshaling uploads file: %v", err)
+		}
 	}
 
 	uploadRecords[item.Name] = item
