@@ -124,7 +124,7 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 			fileCreationDate = d
 		}
 
-		fileName, err := metadata.ClassNameWeek(conf.Classes, conf.SemesterStartDate, fileCreationDate)
+		calculatedFileName, err := metadata.ClassNameWeek(conf.Classes, conf.SemesterStartDate, fileCreationDate)
 		if err != nil {
 			// error messages printed in called function, skip file since which class it is is unknown.
 			continue
@@ -137,7 +137,8 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 		}
 
 		uErr := uploadClient.Upload(vimeo.UploadData{
-			Filename:  fileName,
+			Filename:  file.Name(),
+			VideoName: calculatedFileName,
 			FilePath:  fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()),
 			Password:  password,
 			FileSize:  i.Size(),

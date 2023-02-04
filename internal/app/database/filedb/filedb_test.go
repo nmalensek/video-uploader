@@ -110,11 +110,12 @@ func TestFileDB_GetPutEndToEnd(t *testing.T) {
 	}
 
 	testItemOne := database.UploadRecord{
-		Name:         "test item 1",
-		TusURI:       "https://test.com",
-		VideoURI:     "/videos/1234",
-		Status:       database.InProgress,
-		ErrorDetails: nil,
+		Name:           "test item 1",
+		CalculatedName: "test item 1",
+		TusURI:         "https://test.com",
+		VideoURI:       "/videos/1234",
+		Status:         database.InProgress,
+		ErrorDetails:   nil,
 	}
 
 	err = fdb.PutUpload(testItemOne)

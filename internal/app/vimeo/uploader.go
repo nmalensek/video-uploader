@@ -121,7 +121,9 @@ func (u Uploader) Upload(data UploadData) error {
 			return err
 		}
 
-		r.Name = data.VideoName
+		// currently, using the filename as the video name, but saving what was calculated for metrics.
+		r.Name = data.Filename
+		r.CalculatedName = data.VideoName
 		r.Status = database.InProgress
 		r.TusURI = initialResp.TusURI
 		r.VideoURI = uploadURI + initialResp.FinalURI

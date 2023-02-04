@@ -11,11 +11,12 @@ type UploadDatastore interface {
 // depending on upload implementation. If an error occurred, the status will be set correspondingly
 // and contain details about the error.
 type UploadRecord struct {
-	Name         string       `json:"name"`
-	TusURI       string       `json:"tus_uri"`
-	VideoURI     string       `json:"video_uri"`
-	Status       UploadStatus `json:"status"`
-	ErrorDetails error        `json:"errorDetails,omitempty"`
+	Name           string       `json:"name"`
+	CalculatedName string       `json:"calculated_name"`
+	TusURI         string       `json:"tus_uri"`
+	VideoURI       string       `json:"video_uri"`
+	Status         UploadStatus `json:"status"`
+	ErrorDetails   error        `json:"errorDetails,omitempty"`
 }
 
 // IsEmpty checks relevant UploadRecord properties and returns whether it contains data.
