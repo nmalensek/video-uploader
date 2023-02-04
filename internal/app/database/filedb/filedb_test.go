@@ -11,12 +11,6 @@ import (
 	"github.com/nmalensek/video-uploader/internal/app/database/filedb"
 )
 
-func TestMain(m *testing.M) {
-	code := m.Run()
-	removeTestFile()
-	os.Exit(code)
-}
-
 func removeTestFile() {
 	err := os.Remove("./uploads.json")
 	if err != nil {
@@ -40,6 +34,7 @@ func TestFileDB_GetUpload(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer removeTestFile()
 			f, err := filedb.New(".")
 			if err != nil {
 				t.Fatal(err)
@@ -80,6 +75,7 @@ func TestFileDB_PutUpload(t *testing.T) {
 			},
 		},
 	}
+	defer removeTestFile()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f, err := filedb.New(".")
@@ -95,6 +91,7 @@ func TestFileDB_PutUpload(t *testing.T) {
 }
 
 func TestFileDB_GetPutEndToEnd(t *testing.T) {
+	defer removeTestFile()
 	fdb, err := filedb.New(".")
 	if err != nil {
 		t.Fatal(err)
