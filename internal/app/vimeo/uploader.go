@@ -86,8 +86,9 @@ type httpCaller interface {
 }
 
 const (
-	uploadURI    = "https://api.vimeo.com/me/videos"
-	UploadOffset = "Upload-Offset"
+	uploadURI     = "https://api.vimeo.com/me/videos"
+	uploadFilters = "?fields=name,description,upload,uri"
+	UploadOffset  = "Upload-Offset"
 )
 
 func NewUploader(outputFolderPath string, hc httpCaller, s Settings) (Uploader, error) {
@@ -168,7 +169,7 @@ func initiateUpload(c httpCaller, d UploadData, pat string) (TUSResponse, error)
 		return TUSResponse{}, fmt.Errorf("unable to prepare video payload: %v", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, uploadURI, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%v%v", uploadURI, uploadFilters), bytes.NewReader(bodyBytes))
 	if err != nil {
 		return TUSResponse{}, fmt.Errorf("error creating request: %v", err)
 	}
@@ -187,6 +188,7 @@ func initiateUpload(c httpCaller, d UploadData, pat string) (TUSResponse, error)
 		defer resp.Body.Close()
 
 		if resp.StatusCode == http.StatusTooManyRequests {
+			fmt.Println("rate limited, waiting for 60 seconds and trying again...")
 			time.Sleep(time.Second * 60) // TODO: calculate time remaining
 			retries++
 			continue
@@ -227,6 +229,7 @@ func getOffset(c httpCaller, tusURI string) (int64, error) {
 		defer resp.Body.Close()
 
 		if resp.StatusCode == http.StatusTooManyRequests {
+			fmt.Println("rate limited, waiting for 60 seconds and trying again...")
 			time.Sleep(time.Second * 60) // TODO: calculate time remaining
 			retries++
 			continue
@@ -252,31 +255,3 @@ func getOffset(c httpCaller, tusURI string) (int64, error) {
 
 	return -1, errors.New("unable to determine video offset")
 }
-
-// description
-// name
-// password
-// upload.approach
-// upload.size
-
-// add filter parameters to request: ?fields=name,description,upload,uri
-// get only what we need; the endpoint is designed for UI use so it returns a ton of stuff
-// unmarshal into:
-/*
-{
-    "uri": "/videos/794746791",
-    "name": "Untitled",
-    "description": null,
-    "upload": {
-        "status": "in_progress",
-        "upload_link": "https://us-files.tus.vimeo.com/files/vimeo-prod-src-tus-us/adbd5b04777f1d2823e8f5b76ca6861a",
-        "form": null,
-        "complete_uri": null,
-        "approach": "tus",
-        "size": 13898003,
-        "redirect_url": null,
-        "link": null
-    }
-}
-
-*/
