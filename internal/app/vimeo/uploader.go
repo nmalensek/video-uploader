@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/nmalensek/video-uploader/internal/app/database"
@@ -85,7 +86,8 @@ type httpCaller interface {
 }
 
 const (
-	uploadURI = "https://api.vimeo.com/me/videos"
+	uploadURI    = "https://api.vimeo.com/me/videos"
+	UploadOffset = "Upload-Offset"
 )
 
 func NewUploader(outputFolderPath string, hc httpCaller, s Settings) (Uploader, error) {
@@ -108,7 +110,7 @@ func (u Uploader) Upload(data UploadData) error {
 		fmt.Printf("WARN: error checking for prior upload, attempting upload. error: %v\n", err)
 	}
 
-	// uploadOffset := 0
+	var uploadOffset int64
 
 	// if it's a new upload, make a call to set up all the base information
 	if r.IsEmpty() {
@@ -128,6 +130,13 @@ func (u Uploader) Upload(data UploadData) error {
 			return fmt.Errorf("started upload but error saving initial data: %v\ndata from vimeo:\n%v\n%v\n%v\n%v",
 				saveErr, r.Name, r.Status, r.TusURI, r.VideoURI)
 		}
+	} else {
+		tempOffset, oErr := getOffset(u.client, r.TusURI)
+		if oErr != nil {
+			return fmt.Errorf("could not get offset for video %v: %v", r.Name, err)
+		}
+
+		uploadOffset = tempOffset
 	}
 
 	// if it's not new, continue uploading from specified byte position
@@ -198,8 +207,76 @@ func initiateUpload(c httpCaller, d UploadData, pat string) (TUSResponse, error)
 	return TUSResponse{}, errors.New("failed to upload three times, aborting...")
 }
 
+func getOffset(c httpCaller, tusURI string) (int64, error) {
+	req, err := http.NewRequest(http.MethodPatch, tusURI, nil)
+	if err != nil {
+		return -1, fmt.Errorf("error creating request: %v", err)
+	}
+
+	req.Header.Add("Tus-Resumable", "1.0.0")
+	req.Header.Add("Upload-Offset", "0")
+	req.Header.Add("Content-Type", "application/offset+octet-stream")
+
+	retries := 0
+
+	for retries < 2 {
+		resp, err := c.Do(req)
+		if err != nil {
+			return -1, fmt.Errorf("error making post to vimeo upload URI: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusTooManyRequests {
+			time.Sleep(time.Second * 60) // TODO: calculate time remaining
+			retries++
+			continue
+		}
+
+		// in this case we don't care what we get back, only about the Upload-Offset header value
+		offsetStr := resp.Header.Get(UploadOffset)
+
+		if offsetStr == "" {
+			// retrying probably won't help, but try just in case
+			retries++
+			continue
+		}
+
+		offset, err := strconv.ParseInt(offsetStr, 10, 64)
+		if err != nil {
+			return -1, fmt.Errorf("could not convert %v to a valid byte offset: %v", offsetStr, err)
+		}
+
+		return offset, nil
+
+	}
+
+	return -1, errors.New("unable to determine video offset")
+}
+
 // description
 // name
 // password
 // upload.approach
 // upload.size
+
+// add filter parameters to request: ?fields=name,description,upload,uri
+// get only what we need; the endpoint is designed for UI use so it returns a ton of stuff
+// unmarshal into:
+/*
+{
+    "uri": "/videos/794746791",
+    "name": "Untitled",
+    "description": null,
+    "upload": {
+        "status": "in_progress",
+        "upload_link": "https://us-files.tus.vimeo.com/files/vimeo-prod-src-tus-us/adbd5b04777f1d2823e8f5b76ca6861a",
+        "form": null,
+        "complete_uri": null,
+        "approach": "tus",
+        "size": 13898003,
+        "redirect_url": null,
+        "link": null
+    }
+}
+
+*/
