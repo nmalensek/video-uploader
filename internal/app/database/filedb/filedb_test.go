@@ -130,6 +130,54 @@ func TestFileDB_GetPutEndToEnd(t *testing.T) {
 		return
 	}
 
-	// do two more puts: a new item and one overwriting an existing item.
+	// put a second item
+	testItemTwo := database.UploadRecord{
+		Name:           "test item 2",
+		CalculatedName: "test item 2",
+		TusURI:         "https://test.com",
+		VideoURI:       "/videos/1234",
+		Status:         database.InProgress,
+		ErrorDetails:   nil,
+	}
+
+	err = fdb.PutUpload(testItemTwo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	item2, err := fdb.GetUpload("test item 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(testItemTwo, item2); diff != "" {
+		t.Errorf("TestFileDB_GetPutEndToEnd() mismatch (-want +got):\n%s", diff)
+		return
+	}
+
+	// update existing item's status, simulating an upload finishing.
+	updatedTestItemOne := database.UploadRecord{
+		Name:           "test item 1",
+		CalculatedName: "test item 1", // shouldn't actually change normally
+		TusURI:         "https://test.com",
+		VideoURI:       "/videos/1234",
+		Status:         database.Complete,
+		ErrorDetails:   nil,
+	}
+
+	err = fdb.PutUpload(updatedTestItemOne)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	itemOneUpdated, err := fdb.GetUpload("test item 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(updatedTestItemOne, itemOneUpdated); diff != "" {
+		t.Errorf("TestFileDB_GetPutEndToEnd() mismatch (-want +got):\n%s", diff)
+		return
+	}
 
 }
