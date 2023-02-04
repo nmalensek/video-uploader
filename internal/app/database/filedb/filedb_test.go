@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/nmalensek/video-uploader/internal/app/database"
 	"github.com/nmalensek/video-uploader/internal/app/database/filedb"
 )
@@ -91,4 +92,46 @@ func TestFileDB_PutUpload(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFileDB_GetPutEndToEnd(t *testing.T) {
+	fdb, err := filedb.New(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := fdb.GetUpload("test item 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !r.IsEmpty() {
+		t.Fatalf("TestFileDB_GetPutEndToEnd() expected initial get to be empty, was: %+v", r)
+	}
+
+	testItemOne := database.UploadRecord{
+		Name:         "test item 1",
+		TusURI:       "https://test.com",
+		VideoURI:     "/videos/1234",
+		Status:       database.InProgress,
+		ErrorDetails: nil,
+	}
+
+	err = fdb.PutUpload(testItemOne)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	item, err := fdb.GetUpload("test item 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(testItemOne, item); diff != "" {
+		t.Errorf("TestFileDB_GetPutEndToEnd() mismatch (-want +got):\n%s", diff)
+		return
+	}
+
+	// do two more puts: a new item and one overwriting an existing item.
+
 }
