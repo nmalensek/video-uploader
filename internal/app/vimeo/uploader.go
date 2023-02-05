@@ -142,7 +142,10 @@ func (u Uploader) Upload(data UploadData) error {
 		uploadOffset = tempOffset
 	}
 
-	// if it's not new, continue uploading from specified byte position
+	err = uploadFromOffset(u.client, uploadOffset, r.TusURI, data.FilePath, data.ChunkSize, data.FileSize)
+	if err != nil {
+		return fmt.Errorf("error uploading file %v: %v", data.Filename, err)
+	}
 
 	return nil
 }
@@ -196,6 +199,16 @@ func initiateUpload(c httpCaller, d UploadData, pat string) (TUSResponse, error)
 			continue
 		}
 
+		// TODO: add specific status code handling and unmarshalling.
+		if resp.StatusCode != http.StatusCreated {
+			respBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return TUSResponse{}, fmt.Errorf("could not read initiation response bytes: %v", err)
+			}
+
+			return TUSResponse{}, fmt.Errorf("received status code %v with response body: %v", resp.StatusCode, string(respBytes))
+		}
+
 		respBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return TUSResponse{}, fmt.Errorf("could not read initiation response bytes: %v", err)
@@ -237,6 +250,16 @@ func getOffset(c httpCaller, tusURI string) (int64, error) {
 			continue
 		}
 
+		// TODO: add specific status code handling and unmarshalling.
+		if resp.StatusCode != http.StatusOK {
+			respBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return -1, fmt.Errorf("could not read initiation response bytes: %v", err)
+			}
+
+			return -1, fmt.Errorf("received status code %v with response body: %v", resp.StatusCode, string(respBytes))
+		}
+
 		// in this case we don't care what we get back, only about the Upload-Offset header value
 		offsetStr := resp.Header.Get(UploadOffset)
 
@@ -256,4 +279,65 @@ func getOffset(c httpCaller, tusURI string) (int64, error) {
 	}
 
 	return -1, errors.New("unable to determine video offset")
+}
+
+func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunkSize int, fileSize int64) error {
+	for offset < fileSize {
+		// get body
+
+		req, err := http.NewRequest(http.MethodPatch, tusURI, nil)
+		if err != nil {
+			return fmt.Errorf("error creating request: %v", err)
+		}
+
+		req.Header.Add("Tus-Resumable", "1.0.0")
+		req.Header.Add("Upload-Offset", fmt.Sprint(offset))
+		req.Header.Add("Content-Type", "application/offset+octet-stream")
+
+		retries := 0
+
+		var newOffset int64
+		for retries < 2 {
+			resp, err := c.Do(req)
+			if err != nil {
+				return fmt.Errorf("error making post to vimeo upload URI: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode == http.StatusTooManyRequests {
+				fmt.Println("rate limited, waiting for 60 seconds and trying again...")
+				time.Sleep(time.Second * 60) // TODO: calculate time remaining
+				retries++
+				continue
+			}
+
+			// offset was set incorrectly, reset to what the header says it is and try again.
+			if resp.StatusCode == http.StatusConflict {
+				currOffsetStr := resp.Header.Get(UploadOffset)
+				if currOffsetStr == "" {
+					return fmt.Errorf("Received a 409 on upload but Upload-Offset header was empty for file %v, aborting...", filePath)
+				}
+
+				currOffset, err := strconv.ParseInt(currOffsetStr, 10, 64)
+				if err != nil {
+					return fmt.Errorf("could not convert %v to a valid byte offset: %v", currOffsetStr, err)
+				}
+
+				newOffset = currOffset
+				break
+			}
+
+			// TODO: forbidden error unmarshalling and processing for better error messages - there are daily/weekly upload quotas
+			if resp.StatusCode != http.StatusOK {
+				respBytes, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return fmt.Errorf("could not read initiation response bytes: %v", err)
+				}
+
+				return fmt.Errorf("received status code %v with response body: %v", resp.StatusCode, string(respBytes))
+			}
+		}
+	}
+
+	return nil
 }
