@@ -327,7 +327,7 @@ func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunk
 				break
 			}
 
-			// TODO: forbidden error unmarshalling and processing for better error messages - there are daily/weekly upload quotas
+			// TODO: forbidden error unmarshalling and processing for better error messages - there are daily/weekly upload limits
 			if resp.StatusCode != http.StatusOK {
 				respBytes, err := io.ReadAll(resp.Body)
 				if err != nil {
@@ -336,7 +336,27 @@ func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunk
 
 				return fmt.Errorf("received status code %v with response body: %v", resp.StatusCode, string(respBytes))
 			}
+
+			retOffsetStr := resp.Header.Get(UploadOffset)
+			if retOffsetStr == "" {
+				return fmt.Errorf("Upload-Offset header was empty for file %v, aborting...", filePath)
+			}
+
+			retOffset, err := strconv.ParseInt(retOffsetStr, 10, 64)
+			if err != nil {
+				return fmt.Errorf("could not convert %v to a valid byte offset: %v", retOffsetStr, err)
+			}
+
+			newOffset = retOffset
+			break
 		}
+
+		// offset was not updated within 2 attempts, something went wrong
+		if newOffset == offset {
+			return fmt.Errorf("unable to upload video portion after two attempts, please retry or troubleshoot")
+		}
+
+		offset = newOffset
 	}
 
 	return nil
