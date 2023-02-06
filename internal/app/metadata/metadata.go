@@ -71,8 +71,8 @@ func ClassNameWeek(classes []Class, semesterStartDate time.Time, videoCreationDa
 
 		// TODO: convert potential string time into something accurate
 
-		fifteenMinsBefore := videoCreationDate.Add(time.Minute * -15)
-		thirtyMinsAfter := videoCreationDate.Add(time.Minute * 30)
+		fifteenMinsBefore := videoCreationDate.Add(time.Minute * 45)
+		thirtyMinsAfter := videoCreationDate.Add(time.Minute * 75)
 
 		if c.StartTime.Before(thirtyMinsAfter) && c.StartTime.After(fifteenMinsBefore) {
 			className = c.Name
