@@ -115,12 +115,13 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 		}
 
 		uErr := uploadClient.Upload(vimeo.UploadData{
-			Filename:  file.Name(),
-			VideoName: calculatedFileName,
-			FilePath:  fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()),
-			Password:  password,
-			FileSize:  i.Size(),
-			ChunkSize: conf.ChunkSizeMB,
+			Filename:         strings.TrimSuffix(file.Name(), ".mp4"),
+			VideoDescription: strings.TrimSuffix(file.Name(), ".mp4"),
+			VideoName:        calculatedFileName,
+			FilePath:         fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()),
+			Password:         password,
+			FileSize:         i.Size(),
+			ChunkSize:        conf.ChunkSizeMB,
 		})
 
 		if uErr != nil {

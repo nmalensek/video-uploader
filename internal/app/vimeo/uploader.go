@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/nmalensek/video-uploader/internal/app/database"
@@ -33,7 +32,7 @@ type Privacy struct {
 	Comments string `yaml:"comments" json:"comments"`
 	Embed    string `yaml:"embed" json:"embed"`
 	View     string `yaml:"view" json:"view"`
-	Download bool   `json:"download"`
+	Download bool   `json:"download,omitempty"`
 }
 
 // UploadData holds everything needed for an upload.
@@ -72,8 +71,18 @@ type UploadLink struct {
 
 // TUSResponse is a container for the fields in a tus initiation response.
 type TUSResponse struct {
-	FinalURI string `json:"uri"`
-	TusURI   string `json:"upload"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	FinalURI    string    `json:"uri"`
+	Upload      TUSUpload `json:"upload"`
+}
+
+// TUSUpload contains the fields returned from a successful tus initation call's "upload" node.
+type TUSUpload struct {
+	Status     string `json:"status"`
+	UploadLink string `json:"upload_link"`
+	Approach   string `json:"approach"`
+	Size       int    `json:"size"`
 }
 
 // Uploader uploads videos.
@@ -124,10 +133,10 @@ func (u Uploader) Upload(data UploadData) error {
 		}
 
 		// currently, using the filename as the video name, but saving what was calculated for metrics.
-		r.Name = strings.TrimSuffix(data.Filename, ".mp4")
+		r.Name = data.Filename
 		r.CalculatedName = data.VideoName
 		r.Status = database.InProgress
-		r.TusURI = initialResp.TusURI
+		r.TusURI = initialResp.Upload.UploadLink
 		r.VideoURI = uploadURI + initialResp.FinalURI
 
 		saveErr := u.uploadDB.PutUpload(r)
@@ -154,14 +163,14 @@ func (u Uploader) Upload(data UploadData) error {
 
 func initiateUpload(c httpCaller, d UploadData, pat string) (TUSResponse, error) {
 	payload := UploadPayload{
-		Name:        d.VideoName,
+		Name:        d.Filename,
 		Description: d.VideoDescription,
 		Password:    d.Password,
 		Privacy: Privacy{
 			Comments: "nobody",
 			Embed:    "private",
 			View:     "password",
-			Download: false,
+			// Download: false, // not available to basic members
 		},
 		FolderURI:     "", // TODO
 		ContentRating: []string{"unrated"},
@@ -202,7 +211,7 @@ func initiateUpload(c httpCaller, d UploadData, pat string) (TUSResponse, error)
 		}
 
 		// TODO: add specific status code handling and unmarshalling.
-		if resp.StatusCode != http.StatusCreated {
+		if resp.StatusCode != http.StatusOK {
 			respBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return TUSResponse{}, fmt.Errorf("could not read initiation response bytes: %v", err)
@@ -221,6 +230,8 @@ func initiateUpload(c httpCaller, d UploadData, pat string) (TUSResponse, error)
 		if err != nil {
 			return TUSResponse{}, fmt.Errorf("could not unmarshal initiation response: %v", err)
 		}
+
+		return tResp, nil
 	}
 
 	return TUSResponse{}, errors.New("failed to upload three times, aborting...")
@@ -253,7 +264,7 @@ func getOffset(c httpCaller, tusURI string) (int64, error) {
 		}
 
 		// TODO: add specific status code handling and unmarshalling.
-		if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode != http.StatusNoContent {
 			respBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return -1, fmt.Errorf("could not read initiation response bytes: %v", err)
@@ -284,7 +295,7 @@ func getOffset(c httpCaller, tusURI string) (int64, error) {
 
 func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunkSizeMB int, fileSize int64) error {
 	for offset < fileSize {
-		fileBytes := make([]byte, 0, chunkSizeMB*100000)
+		fileBytes := make([]byte, chunkSizeMB*1000000)
 
 		f, err := os.Open(filePath)
 		if err != nil {
@@ -341,7 +352,7 @@ func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunk
 			}
 
 			// TODO: forbidden error unmarshalling and processing for better error messages - there are daily/weekly upload limits
-			if resp.StatusCode != http.StatusOK {
+			if resp.StatusCode != http.StatusNoContent {
 				respBytes, err := io.ReadAll(resp.Body)
 				if err != nil {
 					return fmt.Errorf("could not read upload response bytes: %v", err)
@@ -366,7 +377,7 @@ func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunk
 
 		// newOffset was not updated within 2 attempts, something went wrong
 		if newOffset <= offset {
-			return fmt.Errorf("unable to upload video portion after two attempts, please retry or troubleshoot")
+			return fmt.Errorf("unable to upload video portion after two attempts, please retry or troubleshoot, old offset was %v, new offset %v", offset, newOffset)
 		}
 
 		offset = newOffset
