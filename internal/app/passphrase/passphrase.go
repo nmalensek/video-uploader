@@ -16,10 +16,13 @@ func Generate() (string, error) {
 	for i := 0; i < wordCount; i++ {
 		wordID := strings.Builder{}
 		for j := 0; j < wordIDLen; j++ {
-			num, err := rand.Int(rand.Reader, big.NewInt(int64(5)))
+			num, err := rand.Int(rand.Reader, big.NewInt(int64(6)))
 			if err != nil {
 				return "", err
 			}
+			// work with numbers 1-6
+			num = num.Add(num, big.NewInt(1))
+
 			wordID.WriteString(num.String())
 		}
 

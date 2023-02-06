@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -40,7 +41,7 @@ func main() {
 	cfg := readConfig()
 
 	cl := &http.Client{
-		Timeout: time.Second * 10,
+		Timeout: time.Minute * 20,
 	}
 
 	vimeoUploader, err := vimeo.NewUploader(cfg.VideoStatusPath, cl, cfg.VimeoSettings)
@@ -104,31 +105,8 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 			continue
 		}
 
-		var fileCreationDate time.Time
-
-		nameChunks := strings.Split(file.Name(), " ")
-
-		d, pErr := time.Parse("2006-01-02", nameChunks[0])
-		if pErr != nil {
-			fmt.Printf("unable to get creation date from name, falling back to mdls...\n")
-
-			// fallback if filename is not prefixed with timestamp
-			t, err := metadata.CreationDateFromMDLS(file.Name())
-			if err != nil {
-				// error messages printed in called function, skip file since both methods failed.
-				continue
-			}
-
-			fileCreationDate = t
-		} else {
-			fileCreationDate = d
-		}
-
-		calculatedFileName, err := metadata.ClassNameWeek(conf.Classes, conf.SemesterStartDate, fileCreationDate)
-		if err != nil {
-			// error messages printed in called function, skip file since which class it is is unknown.
-			continue
-		}
+		// currently only using it for metrics, file name is expected to be final video name.
+		calculatedFileName, _ := getVideoNameByDate(file, conf.Classes, conf.SemesterStartDate)
 
 		password, pErr := passphrase.Generate()
 		if pErr != nil {
@@ -146,9 +124,39 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 		})
 
 		if uErr != nil {
-			fmt.Printf("error uploading %v, file may need to be re-processed. skipping...\n", file.Name())
+			fmt.Printf("error uploading %v, file may need to be re-processed. error: %v\n skipping...\n", file.Name(), uErr)
 		}
 	}
+}
+
+func getVideoNameByDate(file fs.DirEntry, classes []metadata.Class, startDate time.Time) (string, error) {
+	nameChunks := strings.Split(file.Name(), " ")
+
+	var fileCreationDate time.Time
+
+	d, pErr := time.Parse("2006-01-02", nameChunks[0])
+	if pErr != nil {
+		fmt.Printf("unable to get creation date from name, falling back to mdls...\n")
+
+		// fallback if filename is not prefixed with timestamp
+		t, err := metadata.CreationDateFromMDLS(file.Name())
+		if err != nil {
+			// error messages printed in called function.
+			return "", err
+		}
+
+		fileCreationDate = t
+	} else {
+		fileCreationDate = d
+	}
+
+	calculatedFileName, err := metadata.ClassNameWeek(classes, startDate, fileCreationDate)
+	if err != nil {
+		// error messages printed in called function, skip file since which class it is is unknown.
+		return "", err
+	}
+
+	return calculatedFileName, nil
 }
 
 //  post to upload endpoint with derived name + week, standard settings, password, and length

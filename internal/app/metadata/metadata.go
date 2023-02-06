@@ -71,17 +71,17 @@ func ClassNameWeek(classes []Class, semesterStartDate time.Time, videoCreationDa
 
 		// TODO: convert potential string time into something accurate
 
-		fifteenMinsBefore := videoCreationDate.Add(time.Minute * 45)
-		thirtyMinsAfter := videoCreationDate.Add(time.Minute * 75)
+		fortyFiveMinsBeforeEnd := videoCreationDate.Add(time.Minute * 45)
+		seventyFiveMinsAfterStart := videoCreationDate.Add(time.Minute * 75)
 
-		if c.StartTime.Before(thirtyMinsAfter) && c.StartTime.After(fifteenMinsBefore) {
+		if c.StartTime.Before(seventyFiveMinsAfterStart) && c.StartTime.After(fortyFiveMinsBeforeEnd) {
 			className = c.Name
 			break
 		}
 	}
 
 	if className == "" {
-		fmt.Printf("could not determine class name based on file creation date, skipping file...\n")
+		fmt.Printf("could not determine class name based on file creation date\n")
 		fmt.Println(renameFileHint)
 		return "", errors.New("failed to determine class name from file creation date")
 	}
