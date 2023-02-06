@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -275,17 +276,28 @@ func getOffset(c httpCaller, tusURI string) (int64, error) {
 		}
 
 		return offset, nil
-
 	}
 
 	return -1, errors.New("unable to determine video offset")
 }
 
-func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunkSize int, fileSize int64) error {
+func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunkSizeMB int, fileSize int64) error {
 	for offset < fileSize {
-		// get body
+		fileBytes := make([]byte, 0, chunkSizeMB*100000)
 
-		req, err := http.NewRequest(http.MethodPatch, tusURI, nil)
+		f, err := os.Open(filePath)
+		if err != nil {
+			return fmt.Errorf("error opening file to upload: %v", err)
+		}
+
+		_, err = f.ReadAt(fileBytes, offset)
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				return fmt.Errorf("error reading file %v bytes at offset %v, file size %v: %v", filePath, offset, fileSize, err)
+			}
+		}
+
+		req, err := http.NewRequest(http.MethodPatch, tusURI, bytes.NewReader(fileBytes))
 		if err != nil {
 			return fmt.Errorf("error creating request: %v", err)
 		}
@@ -296,7 +308,7 @@ func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunk
 
 		retries := 0
 
-		var newOffset int64
+		var newOffset int64 = -1
 		for retries < 2 {
 			resp, err := c.Do(req)
 			if err != nil {
@@ -331,10 +343,10 @@ func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunk
 			if resp.StatusCode != http.StatusOK {
 				respBytes, err := io.ReadAll(resp.Body)
 				if err != nil {
-					return fmt.Errorf("could not read initiation response bytes: %v", err)
+					return fmt.Errorf("could not read upload response bytes: %v", err)
 				}
 
-				return fmt.Errorf("received status code %v with response body: %v", resp.StatusCode, string(respBytes))
+				return fmt.Errorf("received error status code %v with response body: %v", resp.StatusCode, string(respBytes))
 			}
 
 			retOffsetStr := resp.Header.Get(UploadOffset)
@@ -351,8 +363,8 @@ func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunk
 			break
 		}
 
-		// offset was not updated within 2 attempts, something went wrong
-		if newOffset == offset {
+		// newOffset was not updated within 2 attempts, something went wrong
+		if newOffset <= offset {
 			return fmt.Errorf("unable to upload video portion after two attempts, please retry or troubleshoot")
 		}
 
