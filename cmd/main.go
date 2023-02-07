@@ -115,7 +115,7 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 		}
 
 		uErr := uploadClient.Upload(vimeo.UploadData{
-			Filename:         strings.TrimSuffix(file.Name(), ".mp4"),
+			Filename:         file.Name(),
 			VideoDescription: strings.TrimSuffix(file.Name(), ".mp4"),
 			VideoName:        calculatedFileName,
 			FilePath:         fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()),
@@ -126,6 +126,11 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 
 		if uErr != nil {
 			fmt.Printf("error uploading %v, file may need to be re-processed. error: %v\n skipping...\n", file.Name(), uErr)
+		}
+
+		rErr := os.Rename(fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()), fmt.Sprintf("%v/%v/%v", conf.FinishedFolderPath, "uploaded", file.Name()))
+		if rErr != nil {
+			fmt.Printf("could not move file %v into completed uploads folder: %v", file.Name(), err)
 		}
 	}
 }
@@ -160,12 +165,4 @@ func getVideoNameByDate(file fs.DirEntry, classes []metadata.Class, startDate ti
 	return calculatedFileName, nil
 }
 
-//  post to upload endpoint with derived name + week, standard settings, password, and length
-//      returns upload URI
-// 		if ok status code, save video name and upload URI to .json "database" file with status "IN_PROGRESS"
-//      what status codes can this return? conflict? unauth? If an error response occurs, set status "ERROR" and fill out error details in the file
-//  open file and stream in chunk size chunks to returned upload URI
-//  log progress per chunk (verbose)
-//  log when finished with name, password
-//  update video entry status in "database" to "COMPLETE"
 //  move file to 'uploaded' folder

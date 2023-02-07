@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nmalensek/video-uploader/internal/app/database"
@@ -117,7 +118,7 @@ func NewUploader(outputFolderPath string, hc httpCaller, s Settings) (Uploader, 
 
 func (u Uploader) Upload(data UploadData) error {
 	// check for existing file in tracking file (failed initial upload case)
-	r, err := u.uploadDB.GetUpload(data.Filename)
+	r, err := u.uploadDB.GetUpload(strings.TrimSuffix(data.Filename, ".mp4"))
 	if err != nil {
 		fmt.Printf("WARN: error checking for prior upload, attempting upload. error: %v\n", err)
 	}
@@ -133,7 +134,7 @@ func (u Uploader) Upload(data UploadData) error {
 		}
 
 		// currently, using the filename as the video name, but saving what was calculated for metrics.
-		r.Name = data.Filename
+		r.Name = strings.TrimSuffix(data.Filename, ".mp4")
 		r.CalculatedName = data.VideoName
 		r.Status = database.InProgress
 		r.TusURI = initialResp.Upload.UploadLink
@@ -145,9 +146,24 @@ func (u Uploader) Upload(data UploadData) error {
 				saveErr, r.Name, r.Status, r.TusURI, r.VideoURI)
 		}
 	} else {
+		if r.Status == database.Complete {
+			fmt.Printf("file %v was already uploaded, skipping...\n", data.Filename)
+			return nil
+		}
+
 		tempOffset, oErr := getOffset(u.client, r.TusURI)
 		if oErr != nil {
 			return fmt.Errorf("could not get offset for video %v: %v", r.Name, err)
+		}
+
+		if tempOffset == data.FileSize {
+			r.Status = database.Complete
+			pErr := u.uploadDB.PutUpload(r)
+			if pErr != nil {
+				fmt.Printf("error updating file %v status locally but the upload succeeded: %v", data.Filename, err)
+			}
+			fmt.Printf("file %v was already uploaded, skipping...\n", data.Filename)
+			return nil
 		}
 
 		uploadOffset = tempOffset
@@ -156,6 +172,14 @@ func (u Uploader) Upload(data UploadData) error {
 	err = uploadFromOffset(u.client, uploadOffset, r.TusURI, data.FilePath, data.ChunkSize, data.FileSize)
 	if err != nil {
 		return fmt.Errorf("error uploading file %v: %v", data.Filename, err)
+	}
+
+	fmt.Printf("finished uploading file: \n%v\npassword: %v\n", data.Filename, data.Password)
+
+	r.Status = database.Complete
+	pErr := u.uploadDB.PutUpload(r)
+	if pErr != nil {
+		fmt.Printf("error updating file %v status locally but the upload succeeded: %v", data.Filename, err)
 	}
 
 	return nil
@@ -173,7 +197,7 @@ func initiateUpload(c httpCaller, d UploadData, pat string) (TUSResponse, error)
 			// Download: false, // not available to basic members
 		},
 		FolderURI:     "", // TODO
-		ContentRating: []string{"unrated"},
+		ContentRating: []string{"safe"},
 		Upload: UploadApproachSize{
 			Approach: "tus",
 			Size:     fmt.Sprint(d.FileSize),
@@ -238,14 +262,13 @@ func initiateUpload(c httpCaller, d UploadData, pat string) (TUSResponse, error)
 }
 
 func getOffset(c httpCaller, tusURI string) (int64, error) {
-	req, err := http.NewRequest(http.MethodPatch, tusURI, nil)
+	req, err := http.NewRequest(http.MethodHead, tusURI, nil)
 	if err != nil {
 		return -1, fmt.Errorf("error creating request: %v", err)
 	}
 
 	req.Header.Add("Tus-Resumable", "1.0.0")
-	req.Header.Add("Upload-Offset", "0")
-	req.Header.Add("Content-Type", "application/offset+octet-stream")
+	req.Header.Add("Accept", "application/vnd.vimeo.*+json;version=3.4")
 
 	retries := 0
 
@@ -264,7 +287,7 @@ func getOffset(c httpCaller, tusURI string) (int64, error) {
 		}
 
 		// TODO: add specific status code handling and unmarshalling.
-		if resp.StatusCode != http.StatusNoContent {
+		if resp.StatusCode != http.StatusOK {
 			respBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return -1, fmt.Errorf("could not read initiation response bytes: %v", err)
@@ -295,7 +318,11 @@ func getOffset(c httpCaller, tusURI string) (int64, error) {
 
 func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunkSizeMB int, fileSize int64) error {
 	for offset < fileSize {
-		fileBytes := make([]byte, chunkSizeMB*1000000)
+		var payloadSize int64 = int64(chunkSizeMB) * 1000000
+		if (fileSize - offset) < payloadSize {
+			payloadSize = fileSize - offset
+		}
+		fileBytes := make([]byte, payloadSize)
 
 		f, err := os.Open(filePath)
 		if err != nil {
