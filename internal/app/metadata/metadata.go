@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -21,8 +22,8 @@ type Class struct {
 // CreationDateFromMDLS attempts to derive a file's creation date using the mdls command.
 func CreationDateFromMDLS(absolutePath string) (time.Time, error) {
 
-	metadata := exec.Command("mdls", absolutePath, "-name \"kMDItemContentCreationDate\"")
-	awkCreationDate := exec.Command("awk", "'{print $3 \" \" $4}'")
+	metadata := exec.Command("mdls", absolutePath, "-name", "kMDItemContentCreationDate")
+	awkCreationDate := exec.Command("awk", `{print $3 " " $4}`)
 
 	mOut, err := metadata.CombinedOutput()
 	if err != nil {
@@ -48,7 +49,7 @@ func CreationDateFromMDLS(absolutePath string) (time.Time, error) {
 		return time.Now(), err
 	}
 
-	d, err := time.Parse("2006-01-02", string(creationDateBytes))
+	d, err := time.Parse("2006-01-02", strings.TrimSuffix(string(creationDateBytes), "\n"))
 	if err != nil {
 		fmt.Printf("error formatting %v creation date %v: %v, skipping file...\n", absolutePath, string(creationDateBytes), err)
 		fmt.Println(renameFileHint)

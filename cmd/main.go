@@ -41,10 +41,14 @@ func main() {
 	cfg := readConfig()
 
 	cl := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	uploadCl := &http.Client{
 		Timeout: time.Minute * 20,
 	}
 
-	vimeoUploader, err := vimeo.NewUploader(cfg.VideoStatusPath, cl, cfg.VimeoSettings)
+	vimeoUploader, err := vimeo.NewUploader(cfg.VideoStatusPath, cl, uploadCl, cfg.VimeoSettings)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -106,7 +110,8 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 		}
 
 		// currently only using it for metrics, file name is expected to be final video name.
-		calculatedFileName, _ := getVideoNameByDate(file, conf.Classes, conf.SemesterStartDate)
+		// temporarily skip this until this can be worked out reliably.
+		// calculatedFileName, _ := getVideoNameByDate(file, conf.UploadFolderPath, conf.Classes, conf.SemesterStartDate)
 
 		password, pErr := passphrase.Generate()
 		if pErr != nil {
@@ -117,7 +122,7 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 		uErr := uploadClient.Upload(vimeo.UploadData{
 			Filename:         file.Name(),
 			VideoDescription: strings.TrimSuffix(file.Name(), ".mp4"),
-			VideoName:        calculatedFileName,
+			VideoName:        "",
 			FilePath:         fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()),
 			Password:         password,
 			FileSize:         i.Size(),
@@ -128,6 +133,8 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 			fmt.Printf("error uploading %v, file may need to be re-processed. error: %v\n skipping...\n", file.Name(), uErr)
 		}
 
+		os.MkdirAll(fmt.Sprintf("%v/%v", conf.FinishedFolderPath, "uploaded"), 0750)
+
 		rErr := os.Rename(fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()), fmt.Sprintf("%v/%v/%v", conf.FinishedFolderPath, "uploaded", file.Name()))
 		if rErr != nil {
 			fmt.Printf("could not move file %v into completed uploads folder: %v", file.Name(), err)
@@ -135,7 +142,7 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 	}
 }
 
-func getVideoNameByDate(file fs.DirEntry, classes []metadata.Class, startDate time.Time) (string, error) {
+func getVideoNameByDate(file fs.DirEntry, fileDir string, classes []metadata.Class, startDate time.Time) (string, error) {
 	nameChunks := strings.Split(file.Name(), " ")
 
 	var fileCreationDate time.Time
@@ -145,7 +152,7 @@ func getVideoNameByDate(file fs.DirEntry, classes []metadata.Class, startDate ti
 		fmt.Printf("unable to get creation date from name, falling back to mdls...\n")
 
 		// fallback if filename is not prefixed with timestamp
-		t, err := metadata.CreationDateFromMDLS(file.Name())
+		t, err := metadata.CreationDateFromMDLS(fmt.Sprintf("%v/%v", fileDir, file.Name()))
 		if err != nil {
 			// error messages printed in called function.
 			return "", err

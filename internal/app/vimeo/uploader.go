@@ -88,9 +88,12 @@ type TUSUpload struct {
 
 // Uploader uploads videos.
 type Uploader struct {
-	client   httpCaller
-	settings Settings
-	uploadDB database.UploadDatastore
+	// client is used for all HTTP calls except uploading video chunks.
+	client httpCaller
+	// uploadClient is used to upload video chunks so it has a long timeout property.
+	uploadClient httpCaller
+	settings     Settings
+	uploadDB     database.UploadDatastore
 }
 
 type httpCaller interface {
@@ -103,16 +106,17 @@ const (
 	UploadOffset  = "Upload-Offset"
 )
 
-func NewUploader(outputFolderPath string, hc httpCaller, s Settings) (Uploader, error) {
+func NewUploader(outputFolderPath string, hc httpCaller, uhc httpCaller, s Settings) (Uploader, error) {
 	uploadDBConn, err := filedb.New(outputFolderPath)
 	if err != nil {
 		return Uploader{}, err
 	}
 
 	return Uploader{
-		client:   hc,
-		settings: s,
-		uploadDB: uploadDBConn,
+		client:       hc,
+		uploadClient: uhc,
+		settings:     s,
+		uploadDB:     uploadDBConn,
 	}, nil
 }
 
@@ -138,7 +142,7 @@ func (u Uploader) Upload(data UploadData) error {
 		r.CalculatedName = data.VideoName
 		r.Status = database.InProgress
 		r.TusURI = initialResp.Upload.UploadLink
-		r.VideoURI = uploadURI + initialResp.FinalURI
+		r.VideoURI = "https://vimeo.com/manage" + initialResp.FinalURI
 
 		saveErr := u.uploadDB.PutUpload(r)
 		if saveErr != nil {
@@ -169,12 +173,14 @@ func (u Uploader) Upload(data UploadData) error {
 		uploadOffset = tempOffset
 	}
 
-	err = uploadFromOffset(u.client, uploadOffset, r.TusURI, data.FilePath, data.ChunkSize, data.FileSize)
+	err = uploadFromOffset(u.uploadClient, uploadOffset, r.TusURI, data.FilePath, data.ChunkSize, data.FileSize)
 	if err != nil {
 		return fmt.Errorf("error uploading file %v: %v", data.Filename, err)
 	}
 
-	fmt.Printf("finished uploading file: \n%v\npassword: %v\n", data.Filename, data.Password)
+	fmt.Println("------------------------------")
+	fmt.Printf("finished uploading file: \n%v\nvideo link: %v\npassword: %v\n", data.Filename, r.VideoURI, data.Password)
+	fmt.Println("------------------------------")
 
 	r.Status = database.Complete
 	pErr := u.uploadDB.PutUpload(r)
@@ -317,17 +323,19 @@ func getOffset(c httpCaller, tusURI string) (int64, error) {
 }
 
 func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunkSizeMB int, fileSize int64) error {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("error opening file to upload: %v", err)
+	}
+	defer f.Close()
+
+	fmt.Printf("Uploading %v....", f.Name())
 	for offset < fileSize {
 		var payloadSize int64 = int64(chunkSizeMB) * 1000000
 		if (fileSize - offset) < payloadSize {
 			payloadSize = fileSize - offset
 		}
 		fileBytes := make([]byte, payloadSize)
-
-		f, err := os.Open(filePath)
-		if err != nil {
-			return fmt.Errorf("error opening file to upload: %v", err)
-		}
 
 		_, err = f.ReadAt(fileBytes, offset)
 		if err != nil {
