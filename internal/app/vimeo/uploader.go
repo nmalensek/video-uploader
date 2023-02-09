@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -329,7 +330,7 @@ func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunk
 	}
 	defer f.Close()
 
-	fmt.Printf("Uploading %v....", f.Name())
+	fmt.Printf("Uploading %v....\n", f.Name())
 	for offset < fileSize {
 		var payloadSize int64 = int64(chunkSizeMB) * 1000000
 		if (fileSize - offset) < payloadSize {
@@ -416,7 +417,11 @@ func uploadFromOffset(c httpCaller, offset int64, tusURI, filePath string, chunk
 		}
 
 		offset = newOffset
+		percentUploaded := math.Floor((float64(newOffset) / float64(fileSize) * 100))
+
+		fmt.Printf("%v%% uploaded...", percentUploaded)
 	}
 
+	fmt.Println()
 	return nil
 }
