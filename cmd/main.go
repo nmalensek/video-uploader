@@ -73,6 +73,7 @@ func readConfig() uploadConfig {
 	if err != nil {
 		log.Fatalf("could not open config file: %v", err)
 	}
+	defer file.Close()
 
 	fileBytes, err := io.ReadAll(file)
 	if err != nil {
