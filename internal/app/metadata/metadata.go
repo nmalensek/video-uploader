@@ -49,7 +49,7 @@ func CreationDateFromMDLS(absolutePath string) (time.Time, error) {
 		return time.Now(), err
 	}
 
-	d, err := time.Parse("2006-01-02", strings.TrimSuffix(string(creationDateBytes), "\n"))
+	d, err := time.Parse("2006-01-02 15:04:05", strings.TrimSuffix(string(creationDateBytes), "\n"))
 	if err != nil {
 		fmt.Printf("error formatting %v creation date %v: %v, skipping file...\n", absolutePath, string(creationDateBytes), err)
 		fmt.Println(renameFileHint)

@@ -147,7 +147,7 @@ func getVideoNameByDate(file fs.DirEntry, fileDir string, classes []metadata.Cla
 
 	var fileCreationDate time.Time
 
-	d, pErr := time.Parse("2006-01-02", nameChunks[0])
+	d, pErr := time.Parse("2006-01-02T15:04:05Z", nameChunks[0])
 	if pErr != nil {
 		fmt.Printf("unable to get creation date from name, falling back to mdls...\n")
 
@@ -171,5 +171,3 @@ func getVideoNameByDate(file fs.DirEntry, fileDir string, classes []metadata.Cla
 
 	return calculatedFileName, nil
 }
-
-//  move file to 'uploaded' folder
