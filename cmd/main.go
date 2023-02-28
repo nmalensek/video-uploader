@@ -100,7 +100,7 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 			continue
 		}
 
-		if !strings.HasSuffix(file.Name(), ".mp4") {
+		if !strings.HasSuffix(file.Name(), ".mov") && !strings.HasSuffix(file.Name(), ".mp4") {
 			continue
 		}
 
@@ -134,12 +134,12 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 			fmt.Printf("error uploading %v, file may need to be re-processed. error: %v\n skipping...\n", file.Name(), uErr)
 		}
 
-		os.MkdirAll(fmt.Sprintf("%v/%v", conf.FinishedFolderPath, "uploaded"), 0750)
+		// os.MkdirAll(fmt.Sprintf("%v/%v", conf.FinishedFolderPath, "uploaded"), 0750)
 
-		rErr := os.Rename(fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()), fmt.Sprintf("%v/%v/%v", conf.FinishedFolderPath, "uploaded", file.Name()))
-		if rErr != nil {
-			fmt.Printf("could not move file %v into completed uploads folder: %v", file.Name(), err)
-		}
+		// rErr := os.Rename(fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()), fmt.Sprintf("%v/%v/%v", conf.FinishedFolderPath, "uploaded", file.Name()))
+		// if rErr != nil {
+		// 	fmt.Printf("could not move file %v into completed uploads folder: %v", file.Name(), err)
+		// }
 	}
 }
 
