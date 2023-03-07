@@ -144,7 +144,7 @@ func (u Uploader) Upload(data UploadData) error {
 		r.CalculatedName = data.VideoName
 		r.Status = database.InProgress
 		r.TusURI = initialResp.Upload.UploadLink
-		r.VideoURI = "https://vimeo.com" + initialResp.FinalURI
+		r.VideoURI = "https://vimeo.com" + strings.TrimPrefix(initialResp.FinalURI, "/videos")
 
 		saveErr := u.uploadDB.PutUpload(r)
 		if saveErr != nil {
