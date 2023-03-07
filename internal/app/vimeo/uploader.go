@@ -31,10 +31,11 @@ type UploadSettings struct {
 
 // Privacy defines who can access the uploaded video.
 type Privacy struct {
+	Add      string `yaml:"add" json:"add"`
 	Comments string `yaml:"comments" json:"comments"`
 	Embed    string `yaml:"embed" json:"embed"`
 	View     string `yaml:"view" json:"view"`
-	Download bool   `json:"download,omitempty"`
+	Download *bool  `json:"download,omitempty"`
 }
 
 // UploadData holds everything needed for an upload.
@@ -58,7 +59,7 @@ type UploadApproachSize struct {
 type UploadPayload struct {
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
-	Password    string  `json:"password"`
+	Password    string  `json:"password,omitempty"`
 	Privacy     Privacy `json:"privacy"`
 	// the folder to upload the video to
 	FolderURI     string             `json:"folder_uri"`
@@ -123,7 +124,7 @@ func NewUploader(outputFolderPath string, hc httpCaller, uhc httpCaller, s Setti
 
 func (u Uploader) Upload(data UploadData) error {
 	// check for existing file in tracking file (failed initial upload case)
-	r, err := u.uploadDB.GetUpload(strings.TrimSuffix(data.Filename, ".mp4"))
+	r, err := u.uploadDB.GetUpload(strings.TrimSuffix(strings.TrimSuffix(data.Filename, ".mp4"), ".mov"))
 	if err != nil {
 		fmt.Printf("WARN: error checking for prior upload, attempting upload. error: %v\n", err)
 	}
@@ -132,7 +133,7 @@ func (u Uploader) Upload(data UploadData) error {
 
 	// if it's a new upload, make a call to set up all the base information
 	if r.IsEmpty() {
-		initialResp, err := initiateUpload(u.client, data, u.settings.PersonalAccessToken)
+		initialResp, err := initiateUpload(u.client, data, u.settings)
 		if err != nil {
 			// logging handled in called function.
 			return err
@@ -143,7 +144,7 @@ func (u Uploader) Upload(data UploadData) error {
 		r.CalculatedName = data.VideoName
 		r.Status = database.InProgress
 		r.TusURI = initialResp.Upload.UploadLink
-		r.VideoURI = "https://vimeo.com/manage" + initialResp.FinalURI
+		r.VideoURI = "https://vimeo.com" + initialResp.FinalURI
 
 		saveErr := u.uploadDB.PutUpload(r)
 		if saveErr != nil {
@@ -192,16 +193,17 @@ func (u Uploader) Upload(data UploadData) error {
 	return nil
 }
 
-func initiateUpload(c httpCaller, d UploadData, pat string) (TUSResponse, error) {
+func initiateUpload(c httpCaller, d UploadData, conf Settings) (TUSResponse, error) {
 	payload := UploadPayload{
 		Name:        d.Filename,
 		Description: d.VideoDescription,
 		Password:    d.Password,
 		Privacy: Privacy{
-			Comments: "nobody",
-			Embed:    "private",
-			View:     "password",
-			// Download: false, // not available to basic members
+			Add:      conf.UploadSettings.Privacy.Add,
+			Comments: conf.UploadSettings.Privacy.Comments,
+			Embed:    conf.UploadSettings.Privacy.Embed,
+			View:     conf.UploadSettings.Privacy.View,
+			Download: conf.UploadSettings.Privacy.Download,
 		},
 		FolderURI:     "", // TODO
 		ContentRating: []string{"safe"},
@@ -223,7 +225,7 @@ func initiateUpload(c httpCaller, d UploadData, pat string) (TUSResponse, error)
 
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/vnd.vimeo.*+json;version=3.4")
-	req.Header.Add("Authorization", fmt.Sprintf("bearer %v", pat))
+	req.Header.Add("Authorization", fmt.Sprintf("bearer %v", conf.PersonalAccessToken))
 
 	retries := 0
 

@@ -114,10 +114,14 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 		// temporarily skip this until this can be worked out reliably.
 		// calculatedFileName, _ := getVideoNameByDate(file, conf.UploadFolderPath, conf.Classes, conf.SemesterStartDate)
 
-		password, pErr := passphrase.Generate()
-		if pErr != nil {
-			fmt.Printf("error generating random password: %v, skipping file...\n", err)
-			continue
+		password := ""
+		if conf.VimeoSettings.UploadSettings.Privacy.View == "password" {
+			p, pErr := passphrase.Generate()
+			if pErr != nil {
+				fmt.Printf("error generating random password: %v, skipping file...\n", err)
+				continue
+			}
+			password = p
 		}
 
 		uErr := uploadClient.Upload(vimeo.UploadData{
@@ -132,14 +136,15 @@ func processFiles(conf uploadConfig, uploadClient uploader) {
 
 		if uErr != nil {
 			fmt.Printf("error uploading %v, file may need to be re-processed. error: %v\n skipping...\n", file.Name(), uErr)
+			continue
 		}
 
-		// os.MkdirAll(fmt.Sprintf("%v/%v", conf.FinishedFolderPath, "uploaded"), 0750)
+		os.MkdirAll(fmt.Sprintf("%v/%v", conf.FinishedFolderPath, "uploaded"), 0750)
 
-		// rErr := os.Rename(fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()), fmt.Sprintf("%v/%v/%v", conf.FinishedFolderPath, "uploaded", file.Name()))
-		// if rErr != nil {
-		// 	fmt.Printf("could not move file %v into completed uploads folder: %v", file.Name(), err)
-		// }
+		rErr := os.Rename(fmt.Sprintf("%v/%v", conf.UploadFolderPath, file.Name()), fmt.Sprintf("%v/%v/%v", conf.FinishedFolderPath, "uploaded", file.Name()))
+		if rErr != nil {
+			fmt.Printf("could not move file %v into completed uploads folder: %v", file.Name(), err)
+		}
 	}
 }
 

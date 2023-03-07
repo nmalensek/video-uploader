@@ -34,6 +34,12 @@ vimeo_settings:
       # who can view the video
       view: <anybody | contacts | disable | nobody | password | unlisted >
 
+      # if users can add the video to a channel/showcase
+      add: <true | false>
+
+      # if users can download the video
+      download: <true | false>
+
 # List of current semester's classes with corresponding information to process and format uploads
 classes:
   - name: <name>
